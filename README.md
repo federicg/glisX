@@ -194,27 +194,48 @@ This produces `glisX_<step>.vtu` files.
 
 ## Citation
 
-If you use this code in your research, please cite the associated PhD thesis /
-paper:
+If you use this code in your research, please cite the relevant paper(s).
+
+**Single-phase solver** (`glisX-single-phase`):
 
 ```bibtex
-% TODO: replace with the final reference
-@phdthesis{gatti_phd_landslide,
-  title  = {Numerical modelling of landslide and debris flow dynamics with
-            adaptive staggered Galerkin schemes},
-  author = {Gatti, Federico},
-  school = {Politecnico di Milano},
-  year   = {2024}
+@article{gatti2024singlephase,
+  title   = {A scalable well-balanced numerical scheme for the simulation of
+             fast landslides with efficient time stepping},
+  author  = {Gatti, Federico and de Falco, Carlo and Perotto, Simona and
+             Formaggia, Luca},
+  journal = {Applied Mathematics and Computation},
+  volume  = {468},
+  pages   = {128525},
+  year    = {2024},
+  doi     = {10.1016/j.amc.2023.128525}
 }
 ```
 
-See also the companion lava-flow paper:
+**Two-phase solver** (`glisX-two-phase`):
 
 ```bibtex
-@article{gatti2025second,
-  title={Second-order Optimally Stable IMEX (pseudo-) staggered Galerkin discretization: application to lava flow modeling},
-  author={Gatti, Federico and Orlando, Giuseppe},
-  journal={arXiv preprint arXiv:2509.09460},
-  year={2025}
+@article{gatti2024twophase,
+  title   = {A scalable well-balanced numerical scheme for the modeling of
+             two-phase shallow granular landslide consolidation},
+  author  = {Gatti, Federico and de Falco, Carlo and Perotto, Simona and
+             Formaggia, Luca and Pastor, Manuel},
+  journal = {Journal of Computational Physics},
+  volume  = {501},
+  pages   = {112798},
+  year    = {2024},
+  doi     = {10.1016/j.jcp.2024.112798}
+}
+```
+
+Companion lava-flow paper (shared scheme lineage):
+
+```bibtex
+@article{gatti2025lava,
+  title   = {Second-order Optimally Stable IMEX (pseudo-) staggered Galerkin
+             discretization: application to lava flow modeling},
+  author  = {Gatti, Federico and Orlando, Giuseppe},
+  journal = {arXiv preprint arXiv:2509.09460},
+  year    = {2025}
 }
 ```
