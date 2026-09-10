@@ -164,6 +164,11 @@ FetchContent_MakeAvailable(nlohmann_json)
 # Stage 2: glisX executables
 # ==============================================================================
 
+# Compile-time test-case selectors (see source/*_macro_input.h). Leave unset to
+# use the default baked in the header, or pass e.g. -DTWO_PHASE_TEST=3.
+set(SINGLE_PHASE_TEST "" CACHE STRING "Single-phase test case (see single_phase_macro_input.h)")
+set(TWO_PHASE_TEST    "" CACHE STRING "Two-phase test case (see two_phase_macro_input.h)")
+
 # Single-phase depth-averaged granular flow solver.
 add_executable(glisX-single-phase
   source/main_TG2IMEX-RKC_Strang_balanced.cpp
@@ -181,3 +186,10 @@ foreach(tgt glisX-single-phase glisX-two-phase)
   target_include_directories(${tgt} PRIVATE ${DEPS_PREFIX}/nlohmann)
   target_link_libraries(${tgt} PRIVATE bimpp MPI::MPI_CXX MPI::MPI_C OpenMP::OpenMP_CXX)
 endforeach()
+
+if(NOT SINGLE_PHASE_TEST STREQUAL "")
+  target_compile_definitions(glisX-single-phase PRIVATE SINGLE_PHASE_TEST=${SINGLE_PHASE_TEST})
+endif()
+if(NOT TWO_PHASE_TEST STREQUAL "")
+  target_compile_definitions(glisX-two-phase PRIVATE TWO_PHASE_TEST=${TWO_PHASE_TEST})
+endif()

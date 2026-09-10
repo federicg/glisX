@@ -19,6 +19,7 @@
 
 #include "json.hpp"
 #include "Taylor_Galerkin_IMEX-RKC_Strang_balanced.h"
+#include "single_phase_macro_input.h"
 
 using json = nlohmann::json;
 
@@ -121,12 +122,28 @@ raster_value(const double& x,
   return(gamma[0]+gamma[1]+gamma[2]+gamma[3]);
 }
 
+// ---------------------------------------------------------------------------
+//  Initial condition and geometry, selected at compile time through
+//  SINGLE_PHASE_TEST (see single_phase_macro_input.h).  dem_fun returns the
+//  topography Z; h0_fun the material height H; Ux0_fun / Uy0_fun the mass
+//  fluxes U = H v.
+// ---------------------------------------------------------------------------
+
 double dem_fun (const double& xx, const double& yy)
-{ 
-  //return(0);
-  //return ( 1.+.1*std::exp(-0.5*( std::pow(xx-L/2.,2.) )/std::pow(0.2*L/2.,2.) ) );
-  //return(-xx+L);
-  return(raster_value(xx,yy,dem));
+{
+#if   SINGLE_PHASE_TEST == 2                    // Sec. 4.1.1 - smooth bump, Eq. (31)
+  return 1. + (1./10.) * std::exp (-50./(L*L) * (xx - L/2.) * (xx - L/2.));
+#elif SINGLE_PHASE_TEST == 3                    // Sec. 4.1.2 - smooth topography, Eq. (33)
+  return 5. * std::exp (-2./5. * (xx - 5.) * (xx - 5.));
+#elif SINGLE_PHASE_TEST == 4                    // Sec. 4.1.2 - discontinuous topography, Eq. (34)
+  return (xx >= 4. && xx <= 8.) ? 4. : 0.;
+#elif SINGLE_PHASE_TEST == 7                    // Sec. 4.2.3 - ~22 deg inclined plane
+  return (L - xx) * std::tan (22. * M_PI / 180.);
+#elif SINGLE_PHASE_TEST >= 1 && SINGLE_PHASE_TEST <= 6   // flat bottom
+  return 0.;
+#else                                           // SINGLE_PHASE_TEST == 0 - raster
+  return raster_value (xx, yy, dem);
+#endif
 }
 
 
@@ -134,74 +151,38 @@ double dem_fun (const double& xx, const double& yy)
 using Q1  = q1_vec<distributed_vector>;  // Typedef for distributed q_1 vector
 using Q0  = distributed_vector; //distributed_vector; //std::vector<double>;         // Typedef for local q_0 vector // distributed_vector
 
-//double h0_fun (const double& xx, const double& yy)  { return std::max (0., (8. - std::sin (M_PI * xx / 2. / 400.) - dem[global_coord_2_raster(xx,yy)[0]])); }
-double h0_fun (const double& xx, const double& yy) 
+double h0_fun (const double& xx, const double& yy)
 {
-  //return(1.); 
-  //return(xx/L*1500);
-  //return(std::abs(xx-L/2.)<=L/10. && std::abs(yy-H/2.)<=H/10. ? 10. : 0.  );
-  //return (xx<=L/2. && xx>=L/4. ? 3. : 0.);
-  //return ( 1.+.1*std::exp(-0.5*( std::pow(xx-L/2.,2.) )/std::pow(0.2*L/2.,2.) ) );
-  //return ( 1.+1.*std::exp(-0.5*( std::pow(yy-H/2.,2.) )/std::pow(0.2*L/2.,2.) ) );
-  //return ( 1.+.1*std::exp(-0.5*( std::pow(xx-L/2.,2.) )/std::pow(0.2*L/2.,2.) ) );
-  //return ( 1.+.1*std::exp(-1.*( std::pow(xx-L/2.,2.)+std::pow(yy-H/2.,2.) )/std::pow(0.2*L/2.,2.) ) );
-  //return( std::abs(xx-L/2.)<=.5 && std::abs(yy-H/2.)<=.5 ? 2 : 1. );
-  //return( xx<=L/2. && yy<=H/2. ? 3. : 0. );  
-  //return (xx<=L/4. && yy<=H/4. ? 2. : 1.); 
-  //return(std::abs(xx-L/2.)<=0.5 && std::abs(yy-L/2.)<=0.5 ? 2 : 1. );  
-  //return(std::sqrt(std::pow(xx-L/2.,2.) + std::pow(yy-H/2.,2.))<=.5 ? 2. : 1. );
-  //return(std::sqrt(std::pow(xx-L/2.,2.) + std::pow(yy-H/2.,2.))<=L/4. ? 2 : 0. ); 
-  //return(xx<=L/2. ? 2 : 1. );
-
-
-  //const double HH = 30.;
-  //const double omega = (std::pow((xx-.5*L)/L,2.) + std::pow((yy-.5*L)/L,2.)) <= std::pow((.2 + .01 * std::sin(10.*M_PI*(yy-.5*L)/L)),2.) ? 1. : 0.;
-  //return(std::max (0., std::min (.6*500-(500 - 500 * xx/L), HH)) * omega); 
-  
-  
-
-
-  //return(std::sqrt(std::pow(xx-L/2.,2.) + std::pow(yy-H/2.,2.))<=150 ? 70 : 0. ); 
-  //return(10. - dem[global_coord_2_raster(xx,yy)[0]]);
-  //return(10. - (5.+xx/L));
-  //return(1.);
-  //return(10. - dem_fun(xx,yy));
-
-  return(basin_mask[global_coord_2_raster(xx,yy)[0]]==1 ? 38. : 0.);
-  //return (xx<=L/2. ? 70 : 7.); //(xx<=L/2. ? 70 : 0.);
-  return ( 1.+1.*std::exp(-0.5*( std::pow(xx-L/2.,2.)+std::pow(yy-H/2.,2.) )/std::pow(0.2*L/2.,2.) ) );
-  //return ( 0.+1.*std::exp(-0.5*( std::pow(xx-L/2.,2.)+std::pow(yy-H/2.,2.) )/std::pow(0.2*L/2.,2.) ) );
-
-  
-  
-  if (xx>L*1./4. && xx<L*3./4. && yy >H*1./4. && yy <H*3./4.) //(xx>L*3./10. && xx<7./10.*L)
+#if   SINGLE_PHASE_TEST == 1                    // Sec. 4.1.1 - viscous dam break, H = 1
+  return 1.;
+#elif SINGLE_PHASE_TEST == 2                    // Sec. 4.1.1 - smooth solution, H(x,0) = Z(x), Eq. (32)
+  return dem_fun (xx, yy);
+#elif SINGLE_PHASE_TEST == 3 || SINGLE_PHASE_TEST == 4   // Sec. 4.1.2 - lake at rest, free surface at 10 m, Eq. (35)
+  return 10. - dem_fun (xx, yy);
+#elif SINGLE_PHASE_TEST == 5 || SINGLE_PHASE_TEST == 6   // Sec. 4.2.1 / 4.2.2 - radial dam break, Eq. (36)
+  return (std::sqrt ((xx - L/2.) * (xx - L/2.) + (yy - L/2.) * (yy - L/2.)) <= 0.5) ? 2. : 1.;
+#elif SINGLE_PHASE_TEST == 7                    // Sec. 4.2.3 - granular slide, Eq. (37)
   {
-    //return (1.*std::exp(-0.5*( std::pow(xx-L/2.,2.)+std::pow(yy-H/2.,2.) )/std::pow(0.2*L/2.,2.) ));
-    return 40.;
-  } 
-  
-//  if (xx>L/4 && xx<3/4*L && yy>H/4 && yy <3/4*H)
-//  {
-//    return 2;
-//  }
-  return 0.;
-} 
-double Ux0_fun (double xx, double yy) 
-{ 
-  //const double Ux_l = 1.;
-  //const double Ux_r = .5;
-  //const double x0 = 4.;
-  //const double coeff = 2.*fluid_viscosity/density;
-  //return(Ux_r +.5*(Ux_l-Ux_r)*(1 - std::tanh((Ux_l-Ux_r)*.25/coeff*(xx-x0))));
-  //return( (Ux_r+Ux_l)*.5 - (Ux_l-Ux_r)*.5*std::tanh((Ux_l-Ux_r)*.5/coeff*(xx-x0)) );
-
-  //return( xx<=L/2. ? 2. : 1. ); // shock-shock solution
-  return 0.; 
+    const double amp = 0.2 + 0.01 * std::sin (10. * (yy - L/2.) / L * M_PI / L);
+    const bool in_V = ((xx - L/2.) * (xx - L/2.) / (L*L)
+                     + (yy - L/2.) * (yy - L/2.) / (L*L)) <= amp * amp;
+    return in_V ? std::max (0., std::min (500. * xx / L - 200., 30.)) : 0.;
+  }
+#else                                           // SINGLE_PHASE_TEST == 0 - raster release, H0 = 38 m
+  return (basin_mask[global_coord_2_raster (xx, yy)[0]] == 1 ? 38. : 0.);
+#endif
 }
-double Uy0_fun (double xx, double yy) 
-{ 
-  //return( yy<=H/2. ? 2. : 1. ); // shock-shock solution
-  return 0.; 
+double Ux0_fun (double xx, double yy)
+{
+#if SINGLE_PHASE_TEST == 1                      // Sec. 4.1.1 - Eq. (30)
+  return (xx <= L/2.) ? 1. : 0.5;
+#else
+  return 0.;
+#endif
+}
+double Uy0_fun (double xx, double yy)
+{
+  return 0.;
 }
 
 
@@ -369,8 +350,10 @@ main (int argc, char **argv)
   const double & tolerance_space_adapt                    = input_data["tolerance space adaptation"];
 
   const std::string & SAVE_DIR    = input_data["home saving directory, i.e., where we can find the directory results"];
-  const std::string & DEM_DIR     = input_data["dem file, complete path"]; 
+#if SINGLE_PHASE_TEST == 0
+  const std::string & DEM_DIR     = input_data["dem file, complete path"];
   const std::string & MASK_DIR    = input_data["mask file, complete path"];
+#endif
 
   L = res*(Nx-1);
   H = res*(Ny-1);
@@ -467,8 +450,9 @@ main (int argc, char **argv)
   std::string str = ""; 
   char filename[255]="", arr[255]="";
 
+#if SINGLE_PHASE_TEST == 0
   TIC();
-  str = std::string(DEM_DIR); 
+  str = std::string(DEM_DIR);
   strcpy(arr, str.c_str());
   sprintf(filename, arr, 0);
 
@@ -482,7 +466,7 @@ main (int argc, char **argv)
   dem.resize (M.numel ());
   std::copy (M.fortran_vec (), M.fortran_vec () + M.numel (), dem.begin ());
 
-  str = std::string(MASK_DIR); 
+  str = std::string(MASK_DIR);
   strcpy(arr, str.c_str());
   sprintf(filename, arr, 0);
 
@@ -492,6 +476,9 @@ main (int argc, char **argv)
   basin_mask.resize (M.numel ());
   std::copy (M.fortran_vec (), M.fortran_vec () + M.numel (), basin_mask.begin ());
   TOC("Load data matrix");
+#else
+  (void) VARNAME_1; (void) VARNAME_2;
+#endif
 
 
 

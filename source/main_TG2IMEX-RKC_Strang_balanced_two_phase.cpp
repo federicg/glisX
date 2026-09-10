@@ -19,6 +19,7 @@
 
 #include "json.hpp"
 #include "Taylor_Galerkin_IMEX-RKC_Strang_balanced_two_phase.h"
+#include "two_phase_macro_input.h"
 
 
 using json = nlohmann::json;
@@ -98,66 +99,92 @@ using Q1  = q1_vec<distributed_vector>;  // Typedef for distributed q_1 vector
 using Q0  = distributed_vector; //distributed_vector; //std::vector<double>;         // Typedef for local q_0 vector // distributed_vector
 
 
+// ---------------------------------------------------------------------------
+//  Initial condition and geometry.
+//
+//  The body of each function is selected at compile time through
+//  TWO_PHASE_TEST (see two_phase_macro_input.h).  dem_fun returns the
+//  topography Z; poro_0_fun the initial porosity n_w; h0_fun the total
+//  material height h (split into h_w = n_w h, h_s = (1 - n_w) h); the four
+//  U*0_* functions return the depth-averaged phase mass fluxes U = h v.
+// ---------------------------------------------------------------------------
+
 double dem_fun (const double& xx, const double& yy)
-{ 
-  //double aa = (xx>5 && xx<50 ? -xx+100 : xx<=5 ? 95. : 50.);
-  //aa += (xx>60 && xx<100 && yy>80 && yy<120 ? 30 : 0.);
-  //return( aa ); 
-  //return(0);
-  //return(5.*std::exp(-2./5*(xx-5.)*(xx-5.)));
-  //return(xx>4 && xx<8 ? 4. : 0.);
-  //return(-xx+L);
-  return(raster_value(xx,yy,dem));
+{
+#if   TWO_PHASE_TEST == 1                       // Sec. 4.1.1 - smooth topography
+  return 5. * std::exp (-2./5. * (xx - 5.) * (xx - 5.));
+#elif TWO_PHASE_TEST == 2                       // Sec. 4.1.1 - discontinuous topography
+  return (xx >= 4. && xx <= 8.) ? 4. : 0.;
+#elif TWO_PHASE_TEST == 8                       // Sec. 4.1.4 - discontinuous topography, Eq. (43)
+  if      (xx <= 5.)                                        return 95.;
+  else if (xx <  50.)                                       return -xx + 100.;
+  else if (xx > 60. && xx < 100. && yy > 80. && yy < 120.)  return 80.;
+  else                                                      return 50.;
+#elif TWO_PHASE_TEST >= 3 && TWO_PHASE_TEST <= 7            // flat bottom
+  return 0.;
+#else                                            // TWO_PHASE_TEST == 0 - raster
+  return raster_value (xx, yy, dem);
+#endif
 }
 
 double poro_0_fun (const double& xx, const double& yy)
 {
-  //return(xx>.5 && xx<1.5 ? .4 : .5);
-  //return(xx<L/2. ? .3 : .6); 
-  //std::cout << (density_s - density)/(density_s - density_w) << std::endl;
-  return((density_s - density)/(density_s - density_w));
-} 
-
-
-double h0_fun (const double& xx, const double& yy) 
-{ 
-  //return(xx<10. ? 10. : 0.);
-  //return(xx>4.5 && xx<5.5 ? 1. : .5);
-  //return(1.);
-  return(std::sqrt( (xx-L/2.)*(xx-L/2.) + (yy-H/2.)*(yy-H/2.) )<=L/10 ? 10 : 0. );
-  return(std::abs(xx-L/2.)<=L/10. && std::abs(yy-H/2.)<=H/10. ? 10. : 0.  );
-  //return(xx<10. ? 1.e-8 : 0.);
-  //return(yy>L/2. ? 10. : 0.);
-  //return (xx<=L/2. ? 100. : 50.);
-  //return(10.-dem_fun(xx,yy));
-  //return(std::abs(xx-L/2.)<=L/10. && std::abs(yy-H/2.)<=H/10. ? 10. : 0.  );
-  //return(std::sqrt( (xx-L/2.)*(xx-L/2.) + (yy-H/2.)*(yy-H/2.) )<=L/10 ? 10 : 0. );
-  return(raster_value(xx,yy,h_initial_cond));
-}
-
-double Ux0_w_fun (const double& xx, const double& yy) 
-{ 
-  //return(.2*poro_0_fun(xx,yy));
-  //return(xx<L/2. ? .3*poro_0_fun(xx,yy)*h0_fun(xx,yy) : -.1*poro_0_fun(xx,yy)*h0_fun(xx,yy));
-  //return(-.3);
-  return 0.; 
-}
-double Uy0_w_fun (const double& xx, const double& yy) 
-{ 
-  return 0.; 
+#if   TWO_PHASE_TEST == 3 || TWO_PHASE_TEST == 4           // Sec. 4.1.2 - Eq. (40)
+  return (xx > 0.5 && xx < 1.5) ? 0.4 : 0.5;
+#elif TWO_PHASE_TEST == 5                                  // Sec. 4.1.3 - Eq. (42)
+  return (xx < L/2.) ? 0.3 : 0.6;
+#else                                                      // n_w = (rho_s - rho)/(rho_s - rho_w)
+  return (density_s - density) / (density_s - density_w);
+#endif
 }
 
 
-double Ux0_s_fun (const double& xx, const double& yy) 
-{ 
-  //return(-.3*(1.-poro_0_fun(xx,yy)));
-  //return(xx<L/2. ? -1.4*(1.-poro_0_fun(xx,yy))*h0_fun(xx,yy) : -.9*(1.-poro_0_fun(xx,yy))*h0_fun(xx,yy));
-  //return(.2);
-  return 0.; 
+double h0_fun (const double& xx, const double& yy)
+{
+#if   TWO_PHASE_TEST == 1 || TWO_PHASE_TEST == 2           // Sec. 4.1.1 - lake at rest, free surface at 10 m
+  return 10. - dem_fun (xx, yy);
+#elif TWO_PHASE_TEST == 3 || TWO_PHASE_TEST == 4           // Sec. 4.1.2 - Eq. (40), h_w + h_s = 1
+  return 1.;
+#elif TWO_PHASE_TEST == 5                                  // Sec. 4.1.3 - Eq. (42)
+  return (xx < L/2.) ? 3. : 2.;
+#elif TWO_PHASE_TEST == 6                                  // Sec. 4.1.3 - wet-dry 2D square release
+  return (std::abs (xx - L/2.) <= L/10. && std::abs (yy - H/2.) <= H/10.) ? 10. : 0.;
+#elif TWO_PHASE_TEST == 7 || TWO_PHASE_TEST == 8           // Sec. 4.1.3 / 4.1.4 - 1D release
+  return (xx <= 10.) ? 10. : 0.;
+#else                                                      // TWO_PHASE_TEST == 0 - raster
+  return raster_value (xx, yy, h_initial_cond);
+#endif
 }
-double Uy0_s_fun (const double& xx, const double& yy) 
-{ 
-  return 0.; 
+
+double Ux0_w_fun (const double& xx, const double& yy)
+{
+#if   TWO_PHASE_TEST == 3 || TWO_PHASE_TEST == 4           // Sec. 4.1.2 - Eq. (40)
+  return (xx > 0.5 && xx < 1.5) ? 0.08 : 0.10;
+#elif TWO_PHASE_TEST == 5                                  // Sec. 4.1.3 - Eq. (42)
+  return (xx < L/2.) ? 0.27 : -0.12;
+#else
+  return 0.;
+#endif
+}
+double Uy0_w_fun (const double& xx, const double& yy)
+{
+  return 0.;
+}
+
+
+double Ux0_s_fun (const double& xx, const double& yy)
+{
+#if   TWO_PHASE_TEST == 3 || TWO_PHASE_TEST == 4           // Sec. 4.1.2 - Eq. (40)
+  return (xx > 0.5 && xx < 1.5) ? -0.18 : -0.15;
+#elif TWO_PHASE_TEST == 5                                  // Sec. 4.1.3 - Eq. (42)
+  return (xx < L/2.) ? -2.94 : -0.72;
+#else
+  return 0.;
+#endif
+}
+double Uy0_s_fun (const double& xx, const double& yy)
+{
+  return 0.;
 }
 
 
@@ -337,8 +364,10 @@ main (int argc, char **argv)
   const double & tolerance_space_adapt                    = input_data["tolerance space adaptation"];
 
   const std::string & SAVE_DIR    = input_data["home saving directory, i.e., where we can find the directory results"];
-  const std::string & DEM_DIR     = input_data["dem file, complete path"]; 
+#if TWO_PHASE_TEST == 0
+  const std::string & DEM_DIR     = input_data["dem file, complete path"];
   const std::string & MASK_DIR    = input_data["mask file, complete path"];
+#endif
 
   L = res*(Nx-1);
   H = res*(Ny-1);
@@ -448,8 +477,9 @@ main (int argc, char **argv)
   std::string str = ""; 
   char filename[255]="", arr[255]="";
 
+#if TWO_PHASE_TEST == 0
   TIC();
-  str = std::string(DEM_DIR); 
+  str = std::string(DEM_DIR);
   strcpy(arr, str.c_str());
   sprintf(filename, arr, 0);
 
@@ -463,7 +493,7 @@ main (int argc, char **argv)
   dem.resize (M.numel ());
   std::copy (M.fortran_vec (), M.fortran_vec () + M.numel (), dem.begin ());
 
-  str = std::string(MASK_DIR); 
+  str = std::string(MASK_DIR);
   strcpy(arr, str.c_str());
   sprintf(filename, arr, 0);
 
@@ -473,6 +503,9 @@ main (int argc, char **argv)
   h_initial_cond.resize (M.numel ());
   std::copy (M.fortran_vec (), M.fortran_vec () + M.numel (), h_initial_cond.begin ());
   TOC("Load data matrix");
+#else
+  (void) VARNAME_1; (void) VARNAME_2;
+#endif
   
 
   // Initialize 
